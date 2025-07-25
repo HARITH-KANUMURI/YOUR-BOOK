@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>YOUR BOOK</title>
+  <link rel="icon" href="varma favicon.png" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .profile-dropdown {
+      position: absolute;
+      top: 65px;
+      right: 32px;
+      background-color: #1f1f1f;
+      border: 1px solid #333;
+      border-radius: 8px;
+      min-width: 150px;
+      display: none;
+      flex-direction: column;
+      padding: 10px;
+      z-index: 1000;
+    }
+
+    .profile-dropdown a {
+      padding: 8px 10px;
+      color: white;
+      text-decoration: none;
+      border-radius: 6px;
+      font-weight: 500;
+    }
+
+    .profile-dropdown a:hover {
+      background-color: #4a90e2;
+    }
+
+    #cartBtn {
+      background: none;
+      border: none;
+      font-size: 22px;
+      cursor: pointer;
+      color: white;
+      margin-right: 12px;
+      text-decoration: none;
+    }
+    .usage-panel {
+  background: #1f1f1f;
+  color: white;
+  padding: 20px;
+  border-radius: 12px;
+  max-width: 500px;
+  margin: 40px auto;
+  text-align: center;
+  box-shadow: 0 0 10px rgba(0,0,0,0.3);
+}
+.usage-bar-container {
+  width: 100%;
+  height: 25px;
+  background: #333;
+  border-radius: 20px;
+  overflow: hidden;
+  margin: 12px 0;
+}
+.usage-bar {
+  height: 100%;
+  background: #4caf50;
+  width: 0%;
+  transition: width 0.3s ease;
+}
+
+  </style>
+</head>
+<body>
+
+  <header>
+    <img src="varma favicon.png" alt="Logo" class="logo" />
+    <h1>YOUR BOOK</h1>
+
+    <div class="header-right">
+      <!-- 🛒 Cart button redirects to reservations.html -->
+      <a href="reservations.html" id="cartBtn" title="Your Reservations">🛒</a>
+
+      <a href="login.html" class="sign-in-btn" id="signInBtn">Sign In</a>
+
+      <div id="userProfile" class="user-profile" style="display:none;">
+        <img id="userAvatar" src="default-avatar.png" alt="User Avatar" />
+      </div>
+
+      <div class="profile-dropdown" id="profileMenu">
+        <a href="login.html">Sign In</a>
+        <a href="signup.html">Sign Up</a>
+        <a href="#" id="logoutBtn">Log Out</a>
+      </div>
+    </div>
+  </header>
+
+  <nav>
+    <div class="search-form">
+      <input
+        type="search"
+        id="searchInput"
+        placeholder="🔍 Search by title or author..."
+        title="Search"
+      />
+    </div>
+    <a href="help.html" class="help-btn">Help</a>
+
+    <div id="resetUsageContainer" style="text-align:center; display:none; margin-top: 20px;">
+      <button onclick="resetUsage()" style="
+        padding: 10px 22px;
+        background-color: #4a90e2;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+      ">
+        🔄 Reset Usage to Continue
+      </button>
+    </div>
+  </nav>
+
+  <main>
+    <div class="book-grid" id="bookContainer"></div>
+
+    <div class="pagination">
+      <button id="prevBtn">Previous</button>
+      <span id="pageInfo"></span>
+      <button id="nextBtn">Next</button>
+    </div>
+    <section class="usage-panel">
+  <h2>Your Monthly Usage</h2>
+  <div class="usage-bar-container">
+    <div class="usage-bar" id="usageBar"><script type="module" src="usage.js"></script>
+</div>
+  </div>
+  <p id="usageText">Loading usage...</p>
+  <button id="resetUsageBtn">🔁 Reset Usage</button>
+</section>
+
+  </main>
+
+  <!-- ✅ Load main JS -->
+  <script type="module" src="script.js"></script>
+
+  <!-- 🔐 Firebase Auth Logic -->
+  <script type="module">
+    import { auth } from './firebase-config.js';
+    import {
+      onAuthStateChanged,
+      signOut
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+    const signInBtn = document.getElementById("signInBtn");
+    const userProfile = document.getElementById("userProfile");
+    const userAvatar = document.getElementById("userAvatar");
+    const profileMenu = document.getElementById("profileMenu");
+    const logoutBtn = document.getElementById("logoutBtn");
+
+    userAvatar.addEventListener("click", () => {
+      profileMenu.style.display = profileMenu.style.display === "flex" ? "none" : "flex";
+    });
+
+    logoutBtn.addEventListener("click", () => {
+      signOut(auth).then(() => {
+        window.location.reload();
+      });
+    });
+
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        signInBtn.style.display = "none";
+        userProfile.style.display = "flex";
+        userAvatar.src = user.photoURL || "default-avatar.png";
+      } else {
+        signInBtn.style.display = "inline-block";
+        userProfile.style.display = "none";
+        profileMenu.style.display = "none";
+      }
+    });
+
+    window.addEventListener("click", (e) => {
+      if (!userAvatar.contains(e.target) && !profileMenu.contains(e.target)) {
+        profileMenu.style.display = "none";
+      }
+    });
+  </script>
+
+  <!-- 🔐 Admin Reset -->
+  <div id="adminResetContainer" style="text-align: center; margin-top: 40px; display: none;">
+    <button id="adminResetBtn" style="
+      background-color: #e53935;
+      color: white;
+      font-weight: bold;
+      padding: 12px 20px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+    ">
+      🔐 Admin: Reset All User Usage
+    </button>
+  </div>
+
+</body>
+</html>

@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Login - YOUR BOOK</title>
+  <link rel="icon" href="varma favicon.png" />
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      background: #050505;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+
+    .login-container {
+      background: #1c1b1b;
+      padding: 40px;
+      border-radius: 16px;
+      box-shadow: 0 8px 20px rgba(255, 255, 255, 0.2);
+      width: 350px;
+      text-align: center;
+    }
+
+    .logo {
+      width: 70px;
+      height: 70px;
+      margin-bottom: 20px;
+      border-radius: 50%;
+    }
+
+    h2 {
+      margin-bottom: 24px;
+      color: #faf7f7;
+    }
+
+    input {
+      width: 100%;
+      padding: 12px 16px;
+      margin: 10px 0;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 16px;
+      background: black;
+      color: white;
+    }
+
+    .login-btn,
+    .google-btn,
+    .signup-btn {
+      width: 100%;
+      padding: 12px;
+      color: white;
+      font-size: 16px;
+      font-weight: bold;
+      border: none;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: background 0.3s;
+      margin-top: 10px;
+    }
+
+    .login-btn {
+      background: #4a90e2;
+    }
+
+    .login-btn:hover {
+      background: #3c7ec4;
+    }
+
+    .signup-btn {
+      background: #00b894;
+    }
+
+    .signup-btn:hover {
+      background: #009b72;
+    }
+
+    .google-btn {
+      background: #db4437;
+    }
+
+    .google-btn:hover {
+      background: #c1351d;
+    }
+
+    .guest-btn {
+      margin-top: 12px;
+      color: white;
+      background: transparent;
+      border: 1px solid #4a90e2;
+      border-radius: 20px;
+      padding: 10px;
+      width: 100%;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .guest-btn:hover {
+      background: #4a90e2;
+      color: white;
+    }
+
+    .help-btn {
+      margin-top: 16px;
+      background: none;
+      border: none;
+      color: #4a90e2;
+      cursor: pointer;
+      text-decoration: underline;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <img src="varma favicon.png" alt="YOUR BOOK Logo" class="logo" />
+    <h2>Sign In to YOUR BOOK</h2>
+
+    <input type="email" id="email" placeholder="Email" />
+    <input type="password" id="password" placeholder="Password" />
+
+    <button class="login-btn" onclick="login()">Sign In</button>
+    <button class="signup-btn" onclick="signUp()">Sign Up</button>
+
+    <button class="google-btn" id="googleLoginBtn">Continue with Google</button>
+    <button class="guest-btn" onclick="continueAsGuest()">Continue as Guest</button>
+    <button class="help-btn" onclick="alert('Contact support@yourbook.com')">Need Help?</button>
+  </div>
+
+  <!-- Firebase Auth + Firestore Logic -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import {
+      getAuth,
+      signInWithEmailAndPassword,
+      createUserWithEmailAndPassword,
+      signInWithPopup,
+      GoogleAuthProvider
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+    import {
+      getFirestore,
+      doc,
+      setDoc
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCilMAG_qisn0xDZoW2-RxjN3gXQg2WheM",
+      authDomain: "your-book-login.firebaseapp.com",
+      projectId: "your-book-login",
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore();
+    const provider = new GoogleAuthProvider();
+
+    // ✅ Save user to Firestore after login/signup
+    async function saveUserInfo(user) {
+      const isAdmin = user.email === "admin@yourbook.com"; // ← Replace with your admin email
+      console.log("Saving user:", user.email, "Admin:", isAdmin);
+      try {
+        await setDoc(doc(db, "users", user.uid), {
+          uid: user.uid,
+          email: user.email,
+          isAdmin: isAdmin
+        }, { merge: true });
+        console.log("✅ Saved user info to Firestore");
+      } catch (err) {
+        console.error("❌ Failed to save user to Firestore:", err);
+      }
+    }
+
+    // ✅ Sign In
+    window.login = function () {
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+
+      signInWithEmailAndPassword(auth, email, password)
+        .then((userCredential) => {
+          saveUserInfo(userCredential.user);
+          window.location.href = "index.html";
+        })
+        .catch((error) => {
+          alert("Login failed: " + error.message);
+        });
+    };
+
+    // ✅ Sign Up
+    window.signUp = function () {
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+
+      if (!email || !password) {
+        alert("Please enter email and password.");
+        return;
+      }
+
+      createUserWithEmailAndPassword(auth, email, password)
+        .then((userCredential) => {
+          saveUserInfo(userCredential.user);
+          alert("✅ Sign-up successful!");
+          window.location.href = "index.html";
+        })
+        .catch((error) => {
+          alert("Sign-up failed: " + error.message);
+        });
+    };
+
+    // ✅ Google login
+    document.getElementById("googleLoginBtn").addEventListener("click", () => {
+      signInWithPopup(auth, provider)
+        .then((result) => {
+          saveUserInfo(result.user);
+          window.location.href = "index.html";
+        })
+        .catch((error) => {
+          alert("Google Sign-In failed.");
+        });
+    });
+
+    // ✅ Guest login
+    window.continueAsGuest = function () {
+      window.location.href = "index.html";
+    };
+  </script>
+</body>
+</html>

@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Help - YOUR BOOK</title>
+  <link rel="icon" href="varma favicon.png" />
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #121212;
+      color: #f0f0f0;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 32px;
+      background-color: #000;
+      color: white;
+    }
+
+    .logo {
+      width: 40px;
+      margin-right: 12px;
+    }
+
+    nav {
+      background-color: #1e1e1e;
+      padding: 10px 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .back-btn {
+      color: #ffffff;
+      text-decoration: none;
+      font-weight: bold;
+      font-size: 16px;
+      background-color: #4a90e2;
+      padding: 8px 16px;
+      border-radius: 6px;
+    }
+
+    main {
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 0 20px;
+    }
+
+    h2 {
+      color: #4a90e2;
+    }
+
+    .faq, .feedback-section, .contact-info, .chat-section {
+      margin-bottom: 40px;
+    }
+
+    .faq p {
+      margin: 8px 0;
+      line-height: 1.6;
+    }
+
+    .faq-item {
+      border-bottom: 1px solid #333;
+      padding: 10px 0;
+    }
+
+    #faqSearch {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 20px;
+      font-size: 16px;
+      border-radius: 6px;
+      border: none;
+      background-color: #2a2a2a;
+      color: white;
+    }
+
+    .feedback-section form {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .feedback-section input,
+    .feedback-section textarea {
+      padding: 10px;
+      margin: 8px 0;
+      border-radius: 6px;
+      border: none;
+      font-size: 16px;
+      background-color: #2a2a2a;
+      color: white;
+    }
+
+    .feedback-section textarea {
+      resize: vertical;
+      min-height: 100px;
+    }
+
+    .feedback-section button {
+      padding: 10px;
+      background-color: #4a90e2;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .feedback-section button:hover {
+      background-color: #357ab8;
+    }
+
+    .chat-box {
+      background-color: #2a2a2a;
+      padding: 20px;
+      border-radius: 10px;
+      color: #ccc;
+    }
+
+    .chat-box p {
+      margin: 0;
+    }
+
+    .contact-info p {
+      margin: 8px 0;
+    }
+
+    footer {
+      text-align: center;
+      padding: 20px;
+      background: #1e1e1e;
+      color: #aaa;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <img src="varma favicon.png" alt="Logo" class="logo" />
+    <h1>YOUR BOOK - Help</h1>
+  </header>
+
+  <nav>
+    <a href="index.html" class="back-btn">⬅ Back to Home</a>
+  </nav>
+
+  <main>
+    <h2>🔍 Search FAQs</h2>
+    <input type="text" id="faqSearch" placeholder="Type to search help topics..." oninput="filterFAQs()" />
+
+    <div class="faq" id="faqList">
+      <div class="faq-item">
+        <h3>How do I reserve a book?</h3>
+        <p>Click the "Reserve Book" button on a book's details page. You must be logged in.</p>
+      </div>
+      <div class="faq-item">
+        <h3>What if the book is out of stock?</h3>
+        <p>You'll see "Out of Stock" displayed. Check again later.</p>
+      </div>
+      <div class="faq-item">
+        <h3>What is usage tracking?</h3>
+        <p>Usage limits how many books you can view monthly. You can reset it once per month.</p>
+      </div>
+      <div class="faq-item">
+        <h3>How to reset usage?</h3>
+        <p>Click the “Reset Usage” button shown below the progress bar on homepage.</p>
+      </div>
+      <div class="faq-item">
+        <h3>Where can I give feedback?</h3>
+        <p>Use the form below to send suggestions or issues.</p>
+      </div>
+    </div>
+
+    <div class="feedback-section">
+      <h2>💬 Send Feedback</h2>
+      <form onsubmit="handleFeedbackSubmit(event)">
+        <input type="text" id="fbName" placeholder="Your Name" required />
+        <input type="email" id="fbEmail" placeholder="Your Email" required />
+        <textarea id="fbMessage" placeholder="Your feedback or suggestion..." required></textarea>
+        <button type="submit">📩 Submit Feedback</button>
+      </form>
+      <p id="fbStatus" style="margin-top: 10px; color: #4caf50;"></p>
+    </div>
+
+    <div class="chat-section">
+      <h2>💻 Live Chat Support (Mock)</h2>
+      <div class="chat-box">
+        <p><strong>Bot:</strong> Hello! Need help? Ask me anything!</p>
+        <p><em>(Live chat integration coming soon...)</em></p>
+      </div>
+    </div>
+
+    <div class="contact-info">
+      <h2>📧 Contact Us</h2>
+      <p>Email: <a href="mailto:harithkanumuri@gmail.com" style="color:#4a90e2;">support@yourbook.com</a></p>
+      <p>Discord: <a href="" target="_blank" style="color:#4a90e2;">comming soon</a></p>
+    </div>
+  </main>
+
+  <footer>
+    &copy; 2025 YOUR BOOK. All rights reserved.
+  </footer>
+
+  <script>
+    function filterFAQs() {
+      const query = document.getElementById("faqSearch").value.toLowerCase();
+      const items = document.querySelectorAll(".faq-item");
+      items.forEach(item => {
+        const match = item.innerText.toLowerCase().includes(query);
+        item.style.display = match ? "block" : "none";
+      });
+    }
+
+    function handleFeedbackSubmit(e) {
+      e.preventDefault();
+      const name = document.getElementById("fbName").value;
+      const email = document.getElementById("fbEmail").value;
+      const message = document.getElementById("fbMessage").value;
+      const status = document.getElementById("fbStatus");
+
+      // Placeholder logic for feedback
+      status.textContent = `✅ Thank you for your feedback, ${name}!`;
+
+      e.target.reset();
+    }
+  </script>
+
+</body>
+</html>

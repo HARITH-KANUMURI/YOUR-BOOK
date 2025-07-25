@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Firestore Write Test</title>
+</head>
+<body>
+  <h2>📦 Firestore Write Test</h2>
+  <button onclick="testWrite()">Write Test Data</button>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCilMAG_qisn0xDZoW2-RxjN3gXQg2WheM",
+      authDomain: "your-book-login.firebaseapp.com",
+      projectId: "your-book-login",
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    window.testWrite = async function () {
+      try {
+        await setDoc(doc(db, "test", "demo"), {
+          hello: "world",
+          timestamp: new Date().toISOString()
+        });
+        alert("✅ Test write to Firestore successful!");
+      } catch (err) {
+        alert("❌ Firestore write failed: " + err.message);
+        console.error(err);
+      }
+    };
+  </script>
+</body>
+</html>
