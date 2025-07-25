@@ -1,86 +1,65 @@
 import { db, auth } from "./firebase-config.js";
 import {
   collection,
+  query,
+  where,
+  limit,
   getDocs,
   doc,
   getDoc,
   updateDoc,
   setDoc
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import {
-  onAuthStateChanged
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const urlParams = new URLSearchParams(window.location.search);
 const isbn = urlParams.get("isbn");
 const bookDetail = document.getElementById("bookDetail");
 const recommendations = document.getElementById("recommendations");
 
-let book;
-
 function getCurrentMonthKey() {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 }
-
 function getPreviousMonthKey() {
   const now = new Date();
   now.setMonth(now.getMonth() - 1);
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 }
-
 function updateStarDisplay(value) {
-  const stars = document.querySelectorAll(".star");
-  stars.forEach((star) => {
+  document.querySelectorAll(".star").forEach((star) => {
     const val = parseInt(star.getAttribute("data-value"));
     star.classList.toggle("active", val <= value);
   });
 }
-
 function showPreviousMonthRating(ratingsObj) {
   const ratingVal = document.getElementById("ratingVal");
   const lastMonth = getPreviousMonthKey();
   const monthRatings = ratingsObj?.[lastMonth];
-  let avg;
-
   if (monthRatings && typeof monthRatings === "object") {
     const values = Object.values(monthRatings);
     if (values.length) {
-      avg = values.reduce((a, b) => a + b, 0) / values.length;
+      const avg = values.reduce((a, b) => a + b, 0) / values.length;
       ratingVal.textContent = `${avg.toFixed(1)} / 5`;
       return;
     }
   }
-
-  if (Array.isArray(ratingsObj)) {
-    if (ratingsObj.length > 0) {
-      avg = ratingsObj.reduce((a, b) => a + b, 0) / ratingsObj.length;
-      ratingVal.textContent = `${avg.toFixed(1)} / 5 (legacy)`;
-      return;
-    }
-  }
-
   ratingVal.textContent = "No ratings yet";
 }
 
-(async function () {
+async function loadBook() {
   try {
-    const snapshot = await getDocs(collection(db, "books"));
-    const books = snapshot.docs.map(doc => ({
-      ...doc.data(),
-      id: doc.id
-    }));
-
-    book = books.find(b => b.id === isbn);
-    if (!book) {
+    const bookRef = doc(db, "books", isbn);
+    const bookSnap = await getDoc(bookRef);
+    if (!bookSnap.exists()) {
       bookDetail.innerHTML = "<p>Book not found.</p>";
-      return;
+      return null;
     }
 
+    const book = { id: bookSnap.id, ...bookSnap.data() };
     const img = book.imageL || book.imageM || book.imageS || "ph.png";
     const stockInfo = book.stock !== undefined ? `<p><strong>Stock:</strong> ${book.stock}</p>` : "";
     const locationInfo = book.location ? `<p><strong>Location:</strong> ${book.location}</p>` : "";
-
     const reserveHTML = book.stock > 0
       ? `<button class="reserve-btn" id="reserveBtn">📚 Reserve Book</button>`
       : `<p class="out-of-stock">Out of Stock</p>`;
@@ -106,126 +85,128 @@ function showPreviousMonthRating(ratingsObj) {
       </div>
     `;
 
-    showPreviousMonthRating(book.ratings);
+    showPreviousMonthRating(book.ratings || {});
 
-    onAuthStateChanged(auth, async (user) => {
-      const authStatus = document.getElementById("authStatus");
+    return book;
+  } catch (err) {
+    console.error("❌ Error loading book:", err);
+    bookDetail.innerHTML = "<p>Error loading book.</p>";
+    return null;
+  }
+}
 
-      if (!user) {
-        authStatus.textContent = "⚠ Not logged in.";
-        return;
-      }
+async function setupAuthListeners(book) {
+  onAuthStateChanged(auth, async (user) => {
+    const authStatus = document.getElementById("authStatus");
+    if (!user) {
+      authStatus.textContent = "⚠ Not logged in.";
+      return;
+    }
 
-      authStatus.textContent = `Logged in as: ${user.email || user.uid}`;
+    authStatus.textContent = `Logged in as: ${user.email || user.uid}`;
 
-      // ⭐ Rating
-      const currentKey = getCurrentMonthKey();
-      const stars = document.querySelectorAll(".star");
-      const allRatings = book.ratings || {};
-      const currentRatings = allRatings[currentKey] || {};
+    // ⭐ Rating logic
+    const stars = document.querySelectorAll(".star");
+    const currentKey = getCurrentMonthKey();
+    const userRating = book.ratings?.[currentKey]?.[user.uid];
+    if (userRating) updateStarDisplay(userRating);
 
-      if (currentRatings[user.uid]) {
-        updateStarDisplay(currentRatings[user.uid]);
-      }
-
-      stars.forEach((star) => {
-        star.addEventListener("click", async () => {
-          const value = parseInt(star.getAttribute("data-value"));
-          const bookRef = doc(db, "books", book.id);
-          const bookSnap = await getDoc(bookRef);
-          const bookData = bookSnap.data();
-          const updatedRatings = {
-            ...(bookData.ratings || {}),
-            [currentKey]: {
-              ...(bookData.ratings?.[currentKey] || {}),
-              [user.uid]: value
-            }
-          };
-          await updateDoc(bookRef, { ratings: updatedRatings });
-          updateStarDisplay(value);
-          alert("⭐ Rating saved!");
-        });
+    stars.forEach((star) => {
+      star.addEventListener("click", async () => {
+        const value = parseInt(star.getAttribute("data-value"));
+        const bookRef = doc(db, "books", book.id);
+        const snap = await getDoc(bookRef);
+        const existing = snap.data();
+        const updatedRatings = {
+          ...(existing.ratings || {}),
+          [currentKey]: {
+            ...(existing.ratings?.[currentKey] || {}),
+            [user.uid]: value
+          }
+        };
+        await updateDoc(bookRef, { ratings: updatedRatings });
+        updateStarDisplay(value);
+        alert("⭐ Rating saved!");
       });
+    });
 
-      // ✅ Reservation with registration panel
-      const reserveBtn = document.getElementById("reserveBtn");
-      if (reserveBtn && book.stock > 0) {
-        reserveBtn.addEventListener("click", async () => {
-          const modal = document.getElementById("reservationModal");
-          modal.style.display = "flex";
+    // ✅ Reservation with panel
+    const reserveBtn = document.getElementById("reserveBtn");
+    if (reserveBtn && book.stock > 0) {
+      reserveBtn.addEventListener("click", () => {
+        const modal = document.getElementById("reservationModal");
+        modal.style.display = "flex";
 
-          const confirmBtn = document.getElementById("confirmReservation");
-          confirmBtn.onclick = async () => {
-            const name = document.getElementById("regName").value.trim();
-            const roll = document.getElementById("regRoll").value.trim();
-            const dept = document.getElementById("regDept").value.trim();
-            const branch = document.getElementById("regBranch").value.trim();
-            const section = document.getElementById("regSection").value.trim();
+        document.getElementById("confirmReservation").onclick = async () => {
+          const name = document.getElementById("regName").value.trim();
+          const roll = document.getElementById("regRoll").value.trim();
+          const dept = document.getElementById("regDept").value.trim();
+          const branch = document.getElementById("regBranch").value.trim();
+          const section = document.getElementById("regSection").value.trim();
 
-            if (!name || !roll || !dept || !branch || !section) {
-              alert("⚠ Please fill in all fields.");
+          if (!name || !roll || !dept || !branch || !section) {
+            alert("⚠ Please fill in all fields.");
+            return;
+          }
+
+          try {
+            const resRef = doc(db, "reservations", `${user.uid}_${book.id}`);
+            const resSnap = await getDoc(resRef);
+            if (resSnap.exists()) {
+              alert("⛔ You already reserved this book.");
+              modal.style.display = "none";
               return;
             }
 
-            try {
-              const resRef = doc(db, "reservations", `${user.uid}_${book.id}`);
-              const existing = await getDoc(resRef);
-              if (existing.exists()) {
-                alert("⛔ You already reserved this book.");
-                modal.style.display = "none";
-                return;
-              }
+            await setDoc(resRef, {
+              userId: user.uid,
+              bookId: book.id,
+              timestamp: Date.now(),
+              name,
+              roll,
+              department: dept,
+              branch,
+              section
+            });
 
-              await setDoc(resRef, {
-                userId: user.uid,
-                bookId: book.id,
-                timestamp: Date.now(),
-                name,
-                roll,
-                department: dept,
-                branch,
-                section
-              });
+            await updateDoc(doc(db, "books", book.id), {
+              stock: book.stock - 1
+            });
 
-              const bookRef = doc(db, "books", book.id);
-              await updateDoc(bookRef, { stock: book.stock - 1 });
+            alert("✅ Book reserved!");
+            modal.style.display = "none";
+            window.location.reload();
+          } catch (err) {
+            console.error("Reservation failed:", err);
+            alert("❌ Reservation failed: " + err.message);
+          }
+        };
+      });
+    }
+  });
+}
 
-              alert("✅ Book reserved!");
-              modal.style.display = "none";
-              window.location.reload();
-            } catch (err) {
-              console.error("Reservation failed:", err);
-              alert("❌ Reservation failed: " + err.message);
-            }
-          };
-        });
-      }
-    });
+async function loadRecommendations(book) {
+  const q = query(
+    collection(db, "books"),
+    where("author", "==", book.author),
+    limit(6)
+  );
 
-    // 📚 Recommendations
-    const related = books.filter(b =>
-      b.id !== book.id && (b.author === book.author || b.publisher === book.publisher)
-    ).slice(0, 3);
+  try {
+    const snap = await getDocs(q);
+    snap.forEach(docSnap => {
+      if (docSnap.id === book.id) return;
 
-    const random = books
-      .filter(b => b.id !== book.id && !related.includes(b))
-      .sort(() => 0.5 - Math.random())
-      .slice(0, 3);
-
-    const recs = [...related, ...random];
-    const lastMonthKey = getPreviousMonthKey();
-
-    recs.forEach((b) => {
+      const b = docSnap.data();
       const recImg = b.imageL || b.imageM || b.imageS || "ph.png";
+      const lastMonthKey = getPreviousMonthKey();
       const monthly = b.ratings?.[lastMonthKey];
       let ratingText = "N/A";
 
       if (monthly) {
         const vals = Object.values(monthly);
         if (vals.length) ratingText = (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1) + " / 5";
-      } else if (Array.isArray(b.ratings) && b.ratings.length > 0) {
-        const avg = b.ratings.reduce((a, b) => a + b, 0) / b.ratings.length;
-        ratingText = avg.toFixed(1) + " / 5 (legacy)";
       }
 
       const card = document.createElement("div");
@@ -237,13 +218,20 @@ function showPreviousMonthRating(ratingsObj) {
         <p>Rating: ${ratingText}</p>
       `;
       card.onclick = () => {
-        window.location.href = `book.html?isbn=${b.id}`;
+        window.location.href = `book.html?isbn=${docSnap.id}`;
       };
       recommendations.appendChild(card);
     });
-
   } catch (err) {
-    console.error("❌ Error loading book:", err);
-    bookDetail.innerHTML = "<p>Error loading book.</p>";
+    console.error("Error loading recommendations:", err);
+  }
+}
+
+// 🔄 Main
+(async () => {
+  const book = await loadBook();
+  if (book) {
+    await setupAuthListeners(book);
+    await loadRecommendations(book);
   }
 })();
