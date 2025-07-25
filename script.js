@@ -1,6 +1,10 @@
 import { db, auth } from "./firebase-config.js";
 import {
   collection,
+  query,
+  orderBy,
+  limit,
+  startAfter,
   getDocs,
   getDoc,
   doc,
@@ -8,7 +12,11 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const booksPerPage = 30;
-let books = [], filteredBooks = [], currentPage = 1;
+let currentPage = 1;
+let lastVisibleDoc = null;
+let isSearching = false;
+let lastSearchQuery = "";
+let filteredBooks = [];
 
 const bookContainer = document.getElementById("bookContainer");
 const pageInfo = document.getElementById("pageInfo");
@@ -50,74 +58,6 @@ window.resetUsage = function () {
   location.reload();
 };
 
-// 📚 Load books
-async function loadBooks() {
-  if (limitReached("reads")) return;
-
-  const snapshot = await getDocs(collection(db, "books"));
-  books = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  filteredBooks = books;
-  renderPage(1);
-}
-loadBooks();
-
-function renderPage(page) {
-  bookContainer.innerHTML = "";
-  currentPage = page;
-
-  const start = (page - 1) * booksPerPage;
-  const end = start + booksPerPage;
-  const pageBooks = filteredBooks.slice(start, end);
-
-  if (pageBooks.length === 0) {
-    bookContainer.innerHTML = `<p style="text-align:center;color:white;margin-top:40px;">No books found.</p>`;
-    pageInfo.textContent = "";
-    return;
-  }
-
-  pageBooks.forEach((book) => {
-    const imageUrl = book.imageL || book.imageM || book.imageS || "ph.png";
-    const card = document.createElement("div");
-    card.className = "book-card";
-    card.innerHTML = `
-      <img src="${imageUrl}" alt="${book.title}" />
-      <h3>${book.title}</h3>
-      <p>${book.author}</p>
-      <p>Rating: ${(book.ratings?.length || "N/A")}</p>
-    `;
-    card.onclick = () => {
-      window.location.href = `book.html?isbn=${book.id}`;
-    };
-    bookContainer.appendChild(card);
-  });
-
-  const totalPages = Math.ceil(filteredBooks.length / booksPerPage);
-  pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
-  prevBtn.disabled = currentPage === 1;
-  nextBtn.disabled = currentPage === totalPages;
-}
-
-prevBtn.addEventListener("click", () => {
-  if (currentPage > 1) renderPage(currentPage - 1);
-});
-nextBtn.addEventListener("click", () => {
-  const totalPages = Math.ceil(filteredBooks.length / booksPerPage);
-  if (currentPage < totalPages) renderPage(currentPage + 1);
-});
-
-if (searchInput) {
-  searchInput.addEventListener("input", () => {
-    const keyword = searchInput.value.toLowerCase();
-    filteredBooks = books.filter((book) => {
-      return (
-        (book.title || "").toLowerCase().includes(keyword) ||
-        (book.author || "").toLowerCase().includes(keyword)
-      );
-    });
-    renderPage(1);
-  });
-}
-
 // 🔐 Admin Reset Button Logic
 auth.onAuthStateChanged(async (user) => {
   if (!user) return;
@@ -139,3 +79,145 @@ document.getElementById("adminResetBtn")?.addEventListener("click", async () => 
     console.error(e);
   }
 });
+
+// 🔍 Search
+searchInput?.addEventListener("input", async () => {
+  const keyword = searchInput.value.trim().toLowerCase();
+  if (!keyword) {
+    isSearching = false;
+    currentPage = 1;
+    lastVisibleDoc = null;
+    await loadBooks();
+  } else {
+    isSearching = true;
+    lastSearchQuery = keyword;
+    await searchBooks(keyword);
+  }
+});
+
+// 📚 Load books with pagination
+async function loadBooks() {
+  if (limitReached("reads")) return;
+
+  let q = query(collection(db, "books"), orderBy("title"), limit(booksPerPage));
+  if (lastVisibleDoc) {
+    q = query(collection(db, "books"), orderBy("title"), startAfter(lastVisibleDoc), limit(booksPerPage));
+  }
+
+  const snapshot = await getDocs(q);
+  if (snapshot.empty) {
+    bookContainer.innerHTML = "<p style='color:white; text-align:center; margin-top:40px;'>No more books.</p>";
+    return;
+  }
+
+  lastVisibleDoc = snapshot.docs[snapshot.docs.length - 1];
+  renderBooks(snapshot.docs);
+  updatePagination(snapshot.size);
+}
+
+// 🔍 Search books (client-side)
+async function searchBooks(keyword) {
+  if (limitReached("reads")) return;
+
+  const snapshot = await getDocs(query(collection(db, "books")));
+  const books = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  filteredBooks = books.filter(book =>
+    (book.title || "").toLowerCase().includes(keyword) ||
+    (book.author || "").toLowerCase().includes(keyword)
+  );
+
+  renderFilteredPage(1);
+}
+
+function renderBooks(bookDocs) {
+  bookContainer.innerHTML = "";
+  bookDocs.forEach((doc) => {
+    const book = doc.data();
+    const imageUrl = book.imageL || book.imageM || book.imageS || "ph.png";
+    const ratingText = Array.isArray(book.ratings)
+      ? (book.ratings.reduce((a, b) => a + b, 0) / book.ratings.length).toFixed(1) + " / 5"
+      : "N/A";
+
+    const card = document.createElement("div");
+    card.className = "book-card";
+    card.innerHTML = `
+      <img src="${imageUrl}" alt="${book.title}" />
+      <h3>${book.title}</h3>
+      <p>${book.author}</p>
+      <p>Rating: ${ratingText}</p>
+    `;
+    card.onclick = () => {
+      window.location.href = `book.html?isbn=${doc.id}`;
+    };
+    bookContainer.appendChild(card);
+  });
+
+  pageInfo.textContent = `Page ${currentPage}`;
+  prevBtn.disabled = currentPage === 1;
+}
+
+// 🔄 Filtered book pagination (client-side only)
+function renderFilteredPage(page) {
+  bookContainer.innerHTML = "";
+  currentPage = page;
+
+  const start = (page - 1) * booksPerPage;
+  const end = start + booksPerPage;
+  const pageBooks = filteredBooks.slice(start, end);
+
+  if (pageBooks.length === 0) {
+    bookContainer.innerHTML = `<p style="text-align:center;color:white;margin-top:40px;">No books found.</p>`;
+    pageInfo.textContent = "";
+    return;
+  }
+
+  pageBooks.forEach((book) => {
+    const imageUrl = book.imageL || book.imageM || book.imageS || "ph.png";
+    const ratingText = Array.isArray(book.ratings)
+      ? (book.ratings.reduce((a, b) => a + b, 0) / book.ratings.length).toFixed(1) + " / 5"
+      : "N/A";
+
+    const card = document.createElement("div");
+    card.className = "book-card";
+    card.innerHTML = `
+      <img src="${imageUrl}" alt="${book.title}" />
+      <h3>${book.title}</h3>
+      <p>${book.author}</p>
+      <p>Rating: ${ratingText}</p>
+    `;
+    card.onclick = () => {
+      window.location.href = `book.html?isbn=${book.id}`;
+    };
+    bookContainer.appendChild(card);
+  });
+
+  const totalPages = Math.ceil(filteredBooks.length / booksPerPage);
+  pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+  prevBtn.disabled = currentPage === 1;
+  nextBtn.disabled = currentPage === totalPages;
+}
+
+// ⏮️⏭️ Pagination buttons
+prevBtn.addEventListener("click", async () => {
+  if (currentPage > 1) {
+    currentPage--;
+    if (isSearching) {
+      renderFilteredPage(currentPage);
+    } else {
+      lastVisibleDoc = null;
+      await loadBooks();
+    }
+  }
+});
+
+nextBtn.addEventListener("click", async () => {
+  currentPage++;
+  if (isSearching) {
+    renderFilteredPage(currentPage);
+  } else {
+    await loadBooks();
+  }
+});
+
+// 📌 Load initial books
+await loadBooks();
